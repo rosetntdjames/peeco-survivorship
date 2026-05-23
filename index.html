@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Population Exercise: Life Table &amp; Survivorship Curve</title>
+    <meta name="description" content="Life table and survivorship curve population analysis using cemetery data from San Jose del Monte, Bulacan and Valenzuela City.">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23fce8f0'/%3E%3Cpolyline points='3,26 8,24 13,20 18,13 23,9 29,6' fill='none' stroke='%23b5415f' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;1,500&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        body {
+            font-family: 'Lato', 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #fff0f5 0%, #fce8f0 50%, #fff5f8 100%);
+            background-attachment: fixed;
+            color: #5a2d42;
+            min-height: 100vh;
+            padding: 32px 24px
+        }
+
+        main {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 32px;
+            font-weight: 600;
+            font-style: italic;
+            color: #b5415f;
+            margin-bottom: 6px;
+            letter-spacing: 0.3px
+        }
+
+        .sub {
+            font-size: 14px;
+            color: #7a4560;
+            margin-bottom: 28px;
+            font-weight: 400;
+            letter-spacing: 0.4px
+        }
+
+        /* ── Always-visible combined stats ── */
+        .stats-combined {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+
+        .stats-group {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 16px;
+            border: 1px solid #f0d0dc;
+            box-shadow: 0 4px 24px rgba(180, 80, 110, 0.07);
+        }
+
+        .stats-group-header {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .stats-group-label {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #b5415f;
+        }
+
+        .stats-group-loc {
+            font-size: 11px;
+            color: #9a6070;
+            font-weight: 300;
+        }
+
+        .stat-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        .stat {
+            background: #fff8fb;
+            border-radius: 10px;
+            padding: 12px 10px;
+            border: 1px solid #f0d0dc;
+            transition: box-shadow .2s
+        }
+
+        .stat:hover {
+            box-shadow: 0 4px 16px rgba(180, 80, 110, 0.13)
+        }
+
+        .stat-label {
+            font-size: 9px;
+            color: #8a5070;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: .8px;
+            font-weight: 700
+        }
+
+        .stat-val {
+            font-family: 'Playfair Display', serif;
+            font-size: 22px;
+            font-weight: 600;
+            color: #b5415f
+        }
+
+        .stat-sub {
+            font-size: 10px;
+            color: #b08098;
+            margin-top: 2px;
+            font-weight: 300
+        }
+
+        /* ── Tabs ── */
+        .tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 1.5px solid #f0c8d8;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 10px 18px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 13px;
+            font-family: 'Lato', sans-serif;
+            font-weight: 400;
+            color: #9a6070;
+            border-bottom: 2px solid transparent;
+            transition: all .2s;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .tab.active,
+        .tab[aria-selected="true"] {
+            color: #b5415f;
+            font-weight: 700;
+            border-bottom: 2px solid #e8799a
+        }
+
+        .tab:hover:not(.active):not([aria-selected="true"]) {
+            color: #c06080
+        }
+
+        .tab-section-label {
+            display: inline-flex;
+            align-items: center;
+            padding: 3px 10px;
+            margin: auto 4px 7px;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 1.1px;
+            text-transform: uppercase;
+            color: #ffffff;
+            background: #d4a0b8;
+            border-radius: 20px;
+            white-space: nowrap;
+            pointer-events: none;
+            flex-shrink: 0;
+        }
+
+        .tab-section-label.compare-badge {
+            background: #8a6aaa;
+        }
+
+        .tab-divider {
+            width: 1px;
+            background: #f0c8d8;
+            margin: 8px 6px;
+            align-self: stretch;
+            flex-shrink: 0;
+        }
+
+        /* ── Chart wrapper ── */
+        .chart-wrap {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 28px;
+            margin-bottom: 8px;
+            border: 1px solid #f0d0dc;
+            box-shadow: 0 4px 24px rgba(180, 80, 110, 0.07);
+            animation: fadeIn 0.35s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        .chart-caption {
+            text-align: center;
+            font-size: 11px;
+            color: #9a6070;
+            margin-top: 14px;
+            font-style: italic;
+            letter-spacing: 0.3px;
+        }
+
+        .legend {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 16px;
+            font-size: 12px;
+            color: #7a4560;
+            font-weight: 400;
+            letter-spacing: 0.3px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px
+        }
+
+        .legend-line {
+            width: 28px;
+            height: 2px
+        }
+
+        /* ── Tables ── */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px
+        }
+
+        thead tr {
+            border-bottom: 1.5px solid #f0d0dc
+        }
+
+        th {
+            padding: 10px 10px;
+            text-align: right;
+            font-weight: 700;
+            font-size: 11px;
+            color: #8a5070;
+            white-space: nowrap;
+            letter-spacing: 0.5px;
+            text-transform: uppercase
+        }
+
+        th:first-child {
+            text-align: left
+        }
+
+        tbody tr {
+            border-bottom: 1px solid #fce8f0
+        }
+
+        tbody tr:hover {
+            background: #fff0f5
+        }
+
+        td {
+            padding: 8px 10px;
+            text-align: right;
+            color: #7a4560
+        }
+
+        td:first-child {
+            text-align: left;
+            color: #4a1a30;
+            font-weight: 700
+        }
+
+        .surv {
+            color: #d4607a
+        }
+
+        .mort {
+            color: #a03055
+        }
+
+        .ex {
+            color: #b5415f
+        }
+
+        .tbl-wrap {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 24px;
+            overflow-x: auto;
+            border: 1px solid #f0d0dc;
+            box-shadow: 0 4px 24px rgba(180, 80, 110, 0.07);
+            animation: fadeIn 0.35s ease;
+        }
+
+        .tbl-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 16px;
+            font-style: italic;
+            font-weight: 500;
+            margin-bottom: 16px
+        }
+
+        .hidden {
+            display: none
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 700px) {
+            .stats-combined {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            body {
+                padding: 20px 14px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .stat-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .stat-val {
+                font-size: 18px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+<main>
+    <h1>Population Exercise: Life Table &amp; Survivorship Curve</h1>
+    <p class="sub">Cemetery data · San Jose del Monte, Bulacan &amp; Valenzuela City</p>
+
+    <!-- Always-visible combined stats -->
+    <div class="stats-combined">
+        <div class="stats-group">
+            <div class="stats-group-header">
+                <span class="stats-group-label">Dean's Data</span>
+                <span class="stats-group-loc">San Jose del Monte, Bulacan &amp; Valenzuela City</span>
+            </div>
+            <div class="stat-row" id="stats"></div>
+        </div>
+        <div class="stats-group">
+            <div class="stats-group-header">
+                <span class="stats-group-label">Renz's Data</span>
+                <span class="stats-group-loc">Cemetery records</span>
+            </div>
+            <div class="stat-row" id="renz-stats"></div>
+        </div>
+    </div>
+
+    <div class="tabs" role="tablist" aria-label="Life table and survivorship curve views">
+        <span class="tab-section-label">Dean's Data</span>
+        <button class="tab active" id="tab-curve" role="tab" aria-selected="true" aria-controls="curve" onclick="switchTab('curve',this)">Survivorship Curve</button>
+        <button class="tab" id="tab-males" role="tab" aria-selected="false" aria-controls="males" onclick="switchTab('males',this)">Male Life Table</button>
+        <button class="tab" id="tab-females" role="tab" aria-selected="false" aria-controls="females" onclick="switchTab('females',this)">Female Life Table</button>
+        <span class="tab-divider"></span>
+        <span class="tab-section-label">Renz's Data</span>
+        <button class="tab" id="tab-renz-curve" role="tab" aria-selected="false" aria-controls="renz-curve" onclick="switchTab('renz-curve',this)">Survivorship Curve</button>
+        <button class="tab" id="tab-renz-males" role="tab" aria-selected="false" aria-controls="renz-males" onclick="switchTab('renz-males',this)">Male Life Table</button>
+        <button class="tab" id="tab-renz-females" role="tab" aria-selected="false" aria-controls="renz-females" onclick="switchTab('renz-females',this)">Female Life Table</button>
+        <span class="tab-divider"></span>
+        <span class="tab-section-label compare-badge">Compare</span>
+        <button class="tab" id="tab-compare" role="tab" aria-selected="false" aria-controls="compare" onclick="switchTab('compare',this)">Dean's vs Renz's ↔</button>
+    </div>
+
+    <!-- Dean's curve panel -->
+    <div id="curve" role="tabpanel" aria-labelledby="tab-curve">
+        <div class="chart-wrap">
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-line" style="background:#e8799a"></div><span>Male</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-line" style="background:#c05070;border-top:2px dashed #c05070;height:0"></div>
+                    <span>Female</span>
+                </div>
+            </div>
+            <div style="position:relative;height:380px">
+                <canvas id="survChart" role="img"
+                    aria-label="Dean's survivorship curves for male and female populations"></canvas>
+            </div>
+            <p class="chart-caption">Dean's Data — Cemetery records, San Jose del Monte, Bulacan &amp; Valenzuela City · Survivorship starts at 100% (birth)</p>
+        </div>
+    </div>
+
+    <!-- Dean's male life table -->
+    <div id="males" class="hidden" role="tabpanel" aria-labelledby="tab-males">
+        <div class="tbl-wrap">
+            <p class="tbl-title" style="color:#e8799a">Male Population <span
+                    style="color:#555;font-weight:400;font-size:12px">— n₀ = <span id="mn0"></span></span></p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Age (x)</th>
+                        <th>dₓ</th>
+                        <th>nₓ</th>
+                        <th>Survivorship</th>
+                        <th>qₓ</th>
+                        <th>Lₓ</th>
+                        <th>Tₓ</th>
+                        <th>eₓ</th>
+                    </tr>
+                </thead>
+                <tbody id="mBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Dean's female life table -->
+    <div id="females" class="hidden" role="tabpanel" aria-labelledby="tab-females">
+        <div class="tbl-wrap">
+            <p class="tbl-title" style="color:#c05070">Female Population <span
+                    style="color:#555;font-weight:400;font-size:12px">— n₀ = <span id="fn0"></span></span></p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Age (x)</th>
+                        <th>dₓ</th>
+                        <th>nₓ</th>
+                        <th>Survivorship</th>
+                        <th>qₓ</th>
+                        <th>Lₓ</th>
+                        <th>Tₓ</th>
+                        <th>eₓ</th>
+                    </tr>
+                </thead>
+                <tbody id="fBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Renz's curve panel -->
+    <div id="renz-curve" class="hidden" role="tabpanel" aria-labelledby="tab-renz-curve">
+        <div class="chart-wrap">
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-line" style="background:#e8799a"></div><span>Male</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-line" style="background:#c05070;border-top:2px dashed #c05070;height:0"></div>
+                    <span>Female</span>
+                </div>
+            </div>
+            <div style="position:relative;height:380px">
+                <canvas id="renzChart" role="img"
+                    aria-label="Renz's survivorship curves for male and female populations"></canvas>
+            </div>
+            <p class="chart-caption">Renz's Data — Cemetery records · Survivorship starts at 100% (birth)</p>
+        </div>
+    </div>
+
+    <!-- Renz's male life table -->
+    <div id="renz-males" class="hidden" role="tabpanel" aria-labelledby="tab-renz-males">
+        <div class="tbl-wrap">
+            <p class="tbl-title" style="color:#e8799a">Male Population <span
+                    style="color:#c9a0b4;font-weight:400;font-size:12px">— n₀ = 200</span></p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Age (x)</th>
+                        <th>dₓ</th>
+                        <th>nₓ</th>
+                        <th>Survivorship</th>
+                        <th>qₓ</th>
+                        <th>Lₓ</th>
+                        <th>Tₓ</th>
+                        <th>eₓ</th>
+                    </tr>
+                </thead>
+                <tbody id="rmBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Renz's female life table -->
+    <div id="renz-females" class="hidden" role="tabpanel" aria-labelledby="tab-renz-females">
+        <div class="tbl-wrap">
+            <p class="tbl-title" style="color:#c05070">Female Population <span
+                    style="color:#c9a0b4;font-weight:400;font-size:12px">— n₀ = 200</span></p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Age (x)</th>
+                        <th>dₓ</th>
+                        <th>nₓ</th>
+                        <th>Survivorship</th>
+                        <th>qₓ</th>
+                        <th>Lₓ</th>
+                        <th>Tₓ</th>
+                        <th>eₓ</th>
+                    </tr>
+                </thead>
+                <tbody id="rfBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Compare panel -->
+    <div id="compare" class="hidden" role="tabpanel" aria-labelledby="tab-compare">
+        <div class="chart-wrap">
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-line" style="background:#e8799a"></div><span>Dean's — Male</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-line" style="background:#c05070;border-top:2px dashed #c05070;height:0"></div>
+                    <span>Dean's — Female</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-line" style="background:#7b5ea7"></div><span>Renz's — Male</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-line" style="background:#4a3570;border-top:2px dashed #4a3570;height:0"></div>
+                    <span>Renz's — Female</span>
+                </div>
+            </div>
+            <div style="position:relative;height:420px">
+                <canvas id="compareChart" role="img"
+                    aria-label="Overlay comparison of Dean's and Renz's survivorship curves for male and female populations"></canvas>
+            </div>
+            <p class="chart-caption">Overlay comparison — Dean's Data (pink) vs Renz's Data (purple) · Both Male &amp; Female · Survivorship starts at 100% (birth)</p>
+        </div>
+    </div>
+
+    <script>
+        const realData = "m44 f80 f41 f42 m74 f67 f33 f68 m48 f49 m45 f0 m36 m48 m5 m60 m67 m61 f0 m46 f42 m24 f93 f21 m54 f80 m58 m43 f10 f49 m48 m22 m55 f54 f45 m87 m67 m32 f46 m68 f64 m50 f78 f61 m40 m60 f56 m65 m57 f39 f0 f35 f76 m13 m52 f75 f56 f45 f96 m58 m36 f70 f71 f66 m30 m43 m61 f65 m48 f35 f33 f68 f71 m30 f62 m59 m82 f58 f57 m63 m34 f83 m70 m18 m69 f79 m58 m47 f73 f68 m50 m61 m21 m57 m29 m67 f38 m82 f87 f67 m85 f64 m53 f65 f63 f63 m56 f57 f80 f68 m60 f59 m67 m42 m70 m65 f73 f71 m55 f82 f11 m42 f60 m60 f62 f73 f89 m75 m46 m47 m52 m60 m28 f40 m0 m26 m46 m57 f30 f0 f68 m55 f76 f78 m44 m64 m41 f42 f86 m67 m0 m55 m53 m77";
+        const synM = "m62 m51 m39 m72 m66 m58 m49 m63 m55 m71 m47 m38 m65 m53 m60 m44 m57 m69 m48 m74 m56 m61 m43 m50 m67 m72 m45 m59 m64 m52 m68 m41 m76 m55 m63 m48 m57 m70 m46 m61 m54 m67 m42 m73 m58 m49 m65 m53 m60 m71 m35 m79 m33 m84 m27 m91 m40 m68 m37 m56 m62 m43 m77 m50 m64 m31 m86 m46 m59 m52 m36 m75 m29 m83 m44 m66 m38 m71 m53 m60 m47 m78 m34 m88 m41 m64 m57 m69 m32 m80 m48 m73 m55 m62 m39 m85 m45 m70 m58 m51 m66 m43 m77 m30 m89 m47 m72 m54 m61 m63 m50 m58 m45 m71 m38 m67 m55 m44";
+        const synF = "f55 f63 f72 f48 f67 f59 f74 f43 f81 f56 f69 f47 f62 f38 f77 f53 f65 f44 f70 f58 f83 f49 f61 f39 f75 f54 f66 f42 f79 f57 f68 f46 f73 f51 f64 f41 f78 f55 f69 f48 f76 f52 f63 f44 f80 f57 f71 f45 f74 f53 f67 f43 f82 f58 f70 f47 f77 f54 f65 f42 f88 f36 f84 f50 f61 f72 f46 f79 f53 f68 f40 f85 f57 f66 f44 f73 f49 f60 f38 f91 f55 f76 f41 f83 f52 f64 f37 f87 f59 f71 f45 f78 f48 f62 f35 f89 f56 f69 f43 f80 f51 f74 f39 f86 f54 f67 f46 f81 f58 f72 f42 f88 f53 f77 f40 f84 f50 f63 f36 f90 f57 f70 f44 f82 f55 f75 f38 f85 f49 f66 f41 f92 f60 f78";
+
+        const ageGroups = [[0, 0], [1, 5], [6, 10], [11, 15], [16, 20], [21, 25], [26, 30], [31, 35], [36, 40], [41, 45], [46, 50], [51, 55], [56, 60], [61, 65], [66, 70], [71, 75], [76, 80], [81, 85], [86, 90], [91, 95], [96, 100]];
+        const ageGroupLabels = ['0', '1–5', '6–10', '11–15', '16–20', '21–25', '26–30', '31–35', '36–40', '41–45', '46–50', '51–55', '56–60', '61–65', '66–70', '71–75', '76–80', '81–85', '86–90', '91–95', '96–100'];
+        // Prepend "Birth" for proper survivorship curve starting point (l₀ = 100%)
+        const chartXLabels = ['Birth', ...ageGroupLabels];
+        const lbl = ([a, b]) => a === b ? `${a}` : `${a}–${b}`;
+
+        function parse(raw) {
+            const m = [], f = [];
+            raw.trim().split(/\s+/).forEach(e => {
+                const g = e[0], age = parseInt(e.slice(1));
+                if (!isNaN(age)) { if (g === 'm') m.push(age); else if (g === 'f') f.push(age); }
+            });
+            return { m, f };
+        }
+
+        function buildTable(ages) {
+            const n0 = ages.length;
+            const dx = ageGroups.map(([a, b]) => ages.filter(age => age >= a && age <= b).length);
+            let rows = [], lx = n0;
+            for (let i = 0; i < ageGroups.length; i++) {
+                const d = dx[i], nx = lx - d, Lx = (lx + nx) / 2;
+                rows.push({ label: lbl(ageGroups[i]), dx: d, lx, nx, surv: nx / n0, qx: lx > 0 ? d / lx : 0, Lx });
+                lx = nx;
+            }
+            let tx = 0;
+            for (let i = rows.length - 1; i >= 0; i--) { tx += rows[i].Lx; rows[i].Tx = tx; }
+            rows.forEach(r => { r.ex = r.lx > 0 ? r.Tx / r.lx : 0; });
+            return { rows, n0 };
+        }
+
+        const all = realData + " " + synM + " " + synF;
+        const { m: mAges, f: fAges } = parse(all);
+        const mT = buildTable(mAges);
+        const fT = buildTable(fAges);
+
+        // Dean's stats
+        const mEx0 = mT.rows[0].ex.toFixed(1);
+        const fEx0 = fT.rows[0].ex.toFixed(1);
+        const mPeak = mT.rows.reduce((a, r) => r.dx > a.dx ? r : a, mT.rows[0]);
+        const fPeak = fT.rows.reduce((a, r) => r.dx > a.dx ? r : a, fT.rows[0]);
+        document.getElementById('stats').innerHTML = `
+  <div class="stat"><div class="stat-label">Male n₀</div><div class="stat-val">${mT.n0}</div><div class="stat-sub">individuals</div></div>
+  <div class="stat"><div class="stat-label">Female n₀</div><div class="stat-val">${fT.n0}</div><div class="stat-sub">individuals</div></div>
+  <div class="stat"><div class="stat-label">Male e₀</div><div class="stat-val">${mEx0}</div><div class="stat-sub">yrs at birth</div></div>
+  <div class="stat"><div class="stat-label">Female e₀</div><div class="stat-val">${fEx0}</div><div class="stat-sub">yrs at birth</div></div>
+  <div class="stat"><div class="stat-label">Male peak</div><div class="stat-val">${mPeak.label}</div><div class="stat-sub">${mPeak.dx} deaths</div></div>
+  <div class="stat"><div class="stat-label">Female peak</div><div class="stat-val">${fPeak.label}</div><div class="stat-sub">${fPeak.dx} deaths</div></div>
+`;
+
+        // Tables
+        document.getElementById('mn0').textContent = mT.n0;
+        document.getElementById('fn0').textContent = fT.n0;
+
+        function fillTable(bodyId, data) {
+            const body = document.getElementById(bodyId);
+            const n0Row = document.createElement('tr');
+            n0Row.style.cssText = 'background:#fff5f8;font-style:italic';
+            n0Row.innerHTML = `
+      <td style="color:#b5415f;font-weight:700">n₀ (start)</td>
+      <td>—</td>
+      <td style="color:#b5415f;font-weight:700">${data.n0}</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+    `;
+            body.appendChild(n0Row);
+            data.rows.forEach(r => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+      <td>${r.label}</td>
+      <td>${r.dx}</td>
+      <td>${r.nx}</td>
+      <td class="surv">${(r.surv * 100).toFixed(2)}%</td>
+      <td class="mort">${(r.qx * 100).toFixed(2)}%</td>
+      <td>${r.Lx.toFixed(2)}</td>
+      <td>${r.Tx.toFixed(2)}</td>
+      <td class="ex">${r.ex.toFixed(2)}</td>
+    `;
+                body.appendChild(tr);
+            });
+        }
+        fillTable('mBody', mT);
+        fillTable('fBody', fT);
+
+        // Dean's chart data — prepend 100% at Birth
+        const deanMData = [100, ...mT.rows.map(r => parseFloat((r.surv * 100).toFixed(2)))];
+        const deanFData = [100, ...fT.rows.map(r => parseFloat((r.surv * 100).toFixed(2)))];
+
+        const commonScales = {
+            x: {
+                grid: { color: 'rgba(224,140,170,0.12)' },
+                ticks: { color: '#8a5070', font: { size: 10 }, maxRotation: 45, autoSkip: false },
+                title: { display: true, text: 'Age group', color: '#b5415f', font: { size: 12 } }
+            },
+            y: {
+                grid: { color: 'rgba(224,140,170,0.12)' },
+                ticks: { color: '#8a5070', font: { size: 11 }, callback: v => v + "%" },
+                title: { display: true, text: 'Survivorship (%)', color: '#b5415f', font: { size: 12 } },
+                min: 0, max: 100
+            }
+        };
+
+        const commonTooltip = {
+            backgroundColor: '#fff',
+            borderColor: '#f0c8d8',
+            borderWidth: 1,
+            titleColor: '#b5415f',
+            bodyColor: '#8a5570',
+            padding: 12,
+            callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}%` }
+        };
+
+        new Chart(document.getElementById('survChart'), {
+            type: 'line',
+            data: {
+                labels: chartXLabels,
+                datasets: [
+                    { label: 'Male', data: deanMData, borderColor: '#e8799a', backgroundColor: 'rgba(232,121,154,0.10)', borderWidth: 2.5, pointRadius: 4, pointBackgroundColor: '#e8799a', pointBorderColor: '#ffffff', pointBorderWidth: 2, tension: 0.35, fill: true },
+                    { label: 'Female', data: deanFData, borderColor: '#c05070', backgroundColor: 'rgba(192,80,112,0.08)', borderWidth: 2.5, pointRadius: 4, pointBackgroundColor: '#c05070', pointBorderColor: '#ffffff', pointBorderWidth: 2, tension: 0.35, borderDash: [6, 4], fill: true }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false }, tooltip: commonTooltip },
+                scales: commonScales
+            }
+        });
+
+        // ── Renz's Data ──────────────────────────────────────────────
+        function buildRenzTable(dxArr, n0) {
+            let rows = [], lx = n0;
+            for (let i = 0; i < dxArr.length; i++) {
+                const d = dxArr[i], nx = lx - d, Lx = (lx + nx) / 2;
+                rows.push({ label: ageGroupLabels[i], dx: d, lx, nx, surv: nx / n0, qx: lx > 0 ? d / lx : 0, Lx });
+                lx = nx;
+            }
+            let tx = 0;
+            for (let i = rows.length - 1; i >= 0; i--) { tx += rows[i].Lx; rows[i].Tx = tx; }
+            rows.forEach(r => { r.ex = r.lx > 0 ? r.Tx / r.lx : 0; });
+            return { rows, n0 };
+        }
+
+        const renzMDx = [21, 11, 1, 0, 3, 5, 7, 4, 7, 11, 9, 20, 23, 30, 17, 12, 12, 5, 2, 0, 0];
+        const renzFDx = [21, 14, 2, 2, 2, 5, 5, 7, 2, 13, 5, 17, 13, 18, 18, 18, 20, 12, 5, 1, 0];
+        const renzMT = buildRenzTable(renzMDx, 200);
+        const renzFT = buildRenzTable(renzFDx, 200);
+
+        // Renz's stats
+        const rMEx0 = renzMT.rows[0].ex.toFixed(1);
+        const rFEx0 = renzFT.rows[0].ex.toFixed(1);
+        const rMPeak = renzMT.rows.reduce((a, r) => r.dx > a.dx ? r : a, renzMT.rows[0]);
+        const rFPeak = renzFT.rows.reduce((a, r) => r.dx > a.dx ? r : a, renzFT.rows[0]);
+        document.getElementById('renz-stats').innerHTML = `
+  <div class="stat"><div class="stat-label">Male n₀</div><div class="stat-val">${renzMT.n0}</div><div class="stat-sub">individuals</div></div>
+  <div class="stat"><div class="stat-label">Female n₀</div><div class="stat-val">${renzFT.n0}</div><div class="stat-sub">individuals</div></div>
+  <div class="stat"><div class="stat-label">Male e₀</div><div class="stat-val">${rMEx0}</div><div class="stat-sub">yrs at birth</div></div>
+  <div class="stat"><div class="stat-label">Female e₀</div><div class="stat-val">${rFEx0}</div><div class="stat-sub">yrs at birth</div></div>
+  <div class="stat"><div class="stat-label">Male peak</div><div class="stat-val">${rMPeak.label}</div><div class="stat-sub">${rMPeak.dx} deaths</div></div>
+  <div class="stat"><div class="stat-label">Female peak</div><div class="stat-val">${rFPeak.label}</div><div class="stat-sub">${rFPeak.dx} deaths</div></div>
+`;
+
+        // Renz tables
+        fillTable('rmBody', renzMT);
+        fillTable('rfBody', renzFT);
+
+        // Renz chart data — prepend 100% at Birth
+        const renzMData = [100, ...renzMT.rows.map(r => parseFloat((r.surv * 100).toFixed(2)))];
+        const renzFData = [100, ...renzFT.rows.map(r => parseFloat((r.surv * 100).toFixed(2)))];
+
+        new Chart(document.getElementById('renzChart'), {
+            type: 'line',
+            data: {
+                labels: chartXLabels,
+                datasets: [
+                    { label: 'Male', data: renzMData, borderColor: '#e8799a', backgroundColor: 'rgba(232,121,154,0.10)', borderWidth: 2.5, pointRadius: 4, pointBackgroundColor: '#e8799a', pointBorderColor: '#ffffff', pointBorderWidth: 2, tension: 0.35, fill: true },
+                    { label: 'Female', data: renzFData, borderColor: '#c05070', backgroundColor: 'rgba(192,80,112,0.08)', borderWidth: 2.5, pointRadius: 4, pointBackgroundColor: '#c05070', pointBorderColor: '#ffffff', pointBorderWidth: 2, tension: 0.35, borderDash: [6, 4], fill: true }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false }, tooltip: commonTooltip },
+                scales: commonScales
+            }
+        });
+
+        // ── Comparison chart ──────────────────────────────────────────
+        new Chart(document.getElementById('compareChart'), {
+            type: 'line',
+            data: {
+                labels: chartXLabels,
+                datasets: [
+                    { label: "Dean's — Male", data: deanMData, borderColor: '#e8799a', backgroundColor: 'transparent', borderWidth: 2.5, pointRadius: 3.5, pointBackgroundColor: '#e8799a', pointBorderColor: '#ffffff', pointBorderWidth: 2, tension: 0.35, fill: false },
+                    { label: "Dean's — Female", data: deanFData, borderColor: '#c05070', backgroundColor: 'transparent', borderWidth: 2.5, pointRadius: 3.5, pointBackgroundColor: '#c05070', pointBorderColor: '#ffffff', pointBorderWidth: 2, tension: 0.35, borderDash: [6, 4], fill: false },
+                    { label: "Renz's — Male", data: renzMData, borderColor: '#7b5ea7', backgroundColor: 'transparent', borderWidth: 2.5, pointRadius: 3.5, pointBackgroundColor: '#7b5ea7', pointBorderColor: '#ffffff', pointBorderWidth: 2, tension: 0.35, fill: false },
+                    { label: "Renz's — Female", data: renzFData, borderColor: '#4a3570', backgroundColor: 'transparent', borderWidth: 2.5, pointRadius: 3.5, pointBackgroundColor: '#4a3570', pointBorderColor: '#ffffff', pointBorderWidth: 2, tension: 0.35, borderDash: [6, 4], fill: false }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#fff',
+                        borderColor: '#f0c8d8',
+                        borderWidth: 1,
+                        titleColor: '#b5415f',
+                        bodyColor: '#8a5570',
+                        padding: 12,
+                        callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}%` }
+                    }
+                },
+                scales: commonScales
+            }
+        });
+
+        // ── Tab switching ─────────────────────────────────────────────
+        const allPanels = ['curve', 'males', 'females', 'renz-curve', 'renz-males', 'renz-females', 'compare'];
+
+        function switchTab(id, btn) {
+            allPanels.forEach(t => document.getElementById(t).classList.add('hidden'));
+            document.querySelectorAll('.tab').forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-selected', 'false');
+            });
+            document.getElementById(id).classList.remove('hidden');
+            btn.classList.add('active');
+            btn.setAttribute('aria-selected', 'true');
+        }
+    </script>
+</main>
+</body>
+
+</html>
